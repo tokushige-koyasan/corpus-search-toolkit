@@ -67,3 +67,35 @@
 ## 依存
 
 Python 3 標準ライブラリのみ（外部パッケージ不要）。
+
+## 転写変換器（v1.1.0追加）：scripts/to_iast.py
+
+非IAST転写のテキストをIASTへ機械変換する。私蔵e-text等をコーパス群と同じ土俵で横断検索するための前処理であり、原文は変更せず別ファイルに書き出す（引用・校勘は原文と刊本を参照）。変換は字面置換のみでsandhi再解釈は行わない。英語書誌行は変換対象から保護する。
+
+対応方式（--scheme、既定はauto判定）：
+
+| 方式 | 内容 | 例 |
+|---|---|---|
+| velthuis | ASCII転写 | aa→ā, .t→ṭ, ;s/"s→ś, ~n/;n→ñ, :n→ṅ |
+| at | @記法（X@でダイアクリティクス付加） | a@→ā, s@→ṣ, j@→ñ, c@→ś |
+| mac-norman | 旧Mac系フォント写像（Norman系8ビット） | 0xa7→ś, 0xb5→ṃ, 0xfa→ḥ |
+
+```
+python3 scripts/to_iast.py IN.txt -o OUT.txt
+python3 scripts/to_iast.py --indir 原文dir/ --outdir iast_dir/
+```
+
+変換できない字は〔xx〕（16進）で本文中に明示し、残存数をstderrにTSVで報告する（残存フラグ付き収録の方針）。TeXマークアップは--strip-tex（\documentclass検出時は自動）でプレーン化してから変換する。出力はBOMなしUTF-8・LF・NFC。
+
+## 重複・別版判定器（v1.1.0追加）：scripts/stable_match.py
+
+手持ちテキストとコーパスの照合（完全一致／別版・類似／独自の3段階）、同一文献の別入力・別校訂の検出に用いる。
+
+```
+python3 scripts/stable_match.py --query 手持ち.txt --targets ../gretil-corpus/texts/
+python3 scripts/stable_match.py --query 手持ちdir/ --targets root1/ root2/ --top 3
+```
+
+方法は (1) 破壊的正規化（転写方式差の吸収。照合専用で引用不可）(2) 正規化全文MD5 (3) 16字接片のCRC32安定サンプリングによる含有率 (4) 冒頭・末尾150字の類似度。判定の目安：完全一致＝MD5一致または含有率0.9以上かつ冒頭末尾0.85以上／別版・類似＝含有率0.25以上等／独自＝いずれも未達。閾値は--th-*で変更できる。
+
+**注意**：Python組込みhash()はプロセスごとにシードが変わるため、保存した接片ハッシュを別実行と比較すると全件不一致になる（偽の「独自」判定を生む）。本スクリプトがCRC32を使うのはこのためであり、自作の照合処理でも組込みhash()を照合に使ってはならない。
