@@ -1,6 +1,6 @@
 # corpus-search-toolkit
 
-宗教文献コーパス群（pali・kanseki・kr5・gretil・sarit・dcs・muktabodha・84000-tm・cdsl）の横断検索における綴り揺れ対策の標準手順とツールである。固有名詞検索で母音長短の揺れにより偽ゼロが生じた事例（vajiriya で検索し vājiriyā を取り逃す）の再発防止を目的とする。
+宗教文献コーパス群（pali・kanseki・kr5・gretil・sarit・dcs・muktabodha・84000-tm・cdsl ほか）の横断検索における綴り揺れ対策の標準手順とツール、および取り込み用の変換器である。固有名詞検索で母音長短の揺れにより偽ゼロが生じた事例（vajiriya で検索し vājiriyā を取り逃す）の再発防止を目的とする。
 
 ## 標準手順（4段階）
 
@@ -66,7 +66,7 @@
 
 ## 依存
 
-Python 3 標準ライブラリのみ（外部パッケージ不要）。
+Python 3 標準ライブラリのみ（外部パッケージ不要）。例外は `scripts/bkkbooks_convert.py` で、PyYAML（`pip install pyyaml`）を要する。
 
 ## 転写変換器（v1.1.0追加）：scripts/to_iast.py
 
@@ -99,3 +99,19 @@ python3 scripts/stable_match.py --query 手持ちdir/ --targets root1/ root2/ --
 方法は (1) 破壊的正規化（転写方式差の吸収。照合専用で引用不可）(2) 正規化全文MD5 (3) 16字接片のCRC32安定サンプリングによる含有率 (4) 冒頭・末尾150字の類似度。判定の目安：完全一致＝MD5一致または含有率0.9以上かつ冒頭末尾0.85以上／別版・類似＝含有率0.25以上等／独自＝いずれも未達。閾値は--th-*で変更できる。
 
 **注意**：Python組込みhash()はプロセスごとにシードが変わるため、保存した接片ハッシュを別実行と比較すると全件不一致になる（偽の「独自」判定を生む）。本スクリプトがCRC32を使うのはこのためであり、自作の照合処理でも組込みhash()を照合に使ってはならない。
+
+## bkkbooks 変換器（v1.2.0追加）：scripts/bkkbooks_convert.py
+
+bkkbooks（Kanseki Repository 次世代版、github.com/bkkbooks）の YAML スタンドオフ形式——本文 YAML と `assets/*.markers.yaml`（line-break・page-break・punctuation・indent・substitution 等のオフセット標識）——から、頁・段・行ID付きのプレーンテキストを生成する。基底層（bkkbooks の variant-fold 正規化済本文）と `editions/T`（大正蔵字体本文）の二層をそれぞれ `texts_norm/`・`texts_T/` に書き出し、substitution マーカーから正規化対応表 `variant-fold_restored.tsv` を復元して同梱する。
+
+```
+git clone --depth 1 https://github.com/bkkbooks/KR6t0136
+python3 scripts/bkkbooks_convert.py --repo KR6t0136 --out out/
+python3 scripts/bkkbooks_convert.py --repo-dir clones/ --out out/   # 配下の KR* をすべて
+```
+
+出力の様式：大正蔵の1行＝1行、行頭に `【T77.0303a04】`（巻.頁段行）。ファイル冒頭 `# ` 行に書誌（ID・題名・T番号・上流コミット・変換器版）、`## juan N` 行に巻境界。句読点・字下げの全角空白・訓点仮名などマーカーの content はその位置に挿入し、割注（voice/note、xml-element note）は（　）で囲む。不可視の U+200B・U+FFFC は既定で除去（`--keep-invisible`）。`convert_report.tsv` に文献ごとの行数・字数・二層の本文長一致・置換数を出す。TLS 由来（tls-texts）と CBETA 由来（xml-element・variant マーカーあり）の両方に対応。校異マーカー（variant）は `notes/variants_<ID>.tsv` に別出しし、本文には反映しない。
+
+留意：bkkbooks の T 層では割注の多くが無標識で本文に連続している（標識があるのは一部のみ）。SAT 2018 Hanzi 版（KIT-2920）は割注の一部を欠くため、両者の字単位照合では bkkbooks 側だけにある字句として現れる。
+
+将来の KR6 全体変換（KR6t 等の部単位）にもそのまま使える。
